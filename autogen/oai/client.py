@@ -48,6 +48,13 @@ try:
     gemini_import_exception: Optional[ImportError] = None
 except ImportError as e:
     gemini_import_exception = e
+    
+try:
+    from autogen.oai.vertexai import VertexClient
+    
+    vertexai_import_exception: Optional[ImportError] = None
+except ImportError as e:
+    vertexai_import_exception = e
 
 logger = logging.getLogger(__name__)
 if not logger.handlers:
@@ -406,6 +413,10 @@ class OpenAIWrapper:
         if openai_config["azure_deployment"] is not None:
             openai_config["azure_deployment"] = openai_config["azure_deployment"].replace(".", "")
         openai_config["azure_endpoint"] = openai_config.get("azure_endpoint", openai_config.pop("base_url", None))
+        
+    def _configure_vertexai(self, config: Dict[str, Any], openai_config: Dict[str, Any]) -> None:
+        openai_config["location"] = openai_config.get("location", config.get("location"))
+        openai_config["project"] = openai_config.get("project", config.get("project"))
 
     def _register_default_client(self, config: Dict[str, Any], openai_config: Dict[str, Any]) -> None:
         """Create a client with the given config to override openai_config,
@@ -436,6 +447,12 @@ class OpenAIWrapper:
                 if gemini_import_exception:
                     raise ImportError("Please install `google-generativeai` to use Google OpenAI API.")
                 client = GeminiClient(**openai_config)
+                self._clients.append(client)
+            elif api_type is not None and api_type.startswith("vertexai"):
+                if vertexai_import_exception:
+                    raise ImportError("Please install `google-cloud-aiplatform` to use VertexAI API.")
+                self._configure_vertexai(config, openai_config)
+                client = VertexClient(**openai_config)
                 self._clients.append(client)
             else:
                 client = OpenAI(**openai_config)
